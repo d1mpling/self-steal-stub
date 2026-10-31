@@ -7,7 +7,7 @@ set -eu
 D="${1:-}"; THEME="${2:-}"
 
 if [ -z "$D" ]; then
-  read -rp "Домен ноды (например pl-1.example.com): " D </dev/tty
+  read -rp "Домен ноды (например ni-1.example.com): " D </dev/tty
 fi
 D="${D,,}"
 [[ "$D" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$ ]] || { echo "Неверный домен: $D"; exit 1; }
