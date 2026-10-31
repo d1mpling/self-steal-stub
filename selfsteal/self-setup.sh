@@ -1,5 +1,4 @@
 #!/bin/bash
-# Selfsteal-заглушка для Xray Reality: nginx + сертификат + сайт на выбор
 set -eu
 
 [ "$(id -u)" -eq 0 ] || { echo "Запустите от root"; exit 1; }
@@ -24,7 +23,6 @@ case "$THEME" in rust|borsch|bakery) ;; *) echo "Темы: rust, borsch, bakery"
 
 echo "== Домен: $D, тема: $THEME =="
 
-# ---------- 0. Пакеты и проверки ----------
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y dnsutils curl >/dev/null
@@ -48,12 +46,10 @@ if port_busy 80; then
   fi
 fi
 
-# ---------- 1. nginx и certbot ----------
 apt-get install -y nginx certbot >/dev/null
 rm -f /etc/nginx/sites-enabled/default
 mkdir -p /var/www/acme /var/www/site
 
-# server_tokens: добавляем, только если ещё не включён
 if ! nginx -T 2>/dev/null | grep -Eq '^\s*server_tokens\s+off'; then
   echo 'server_tokens off;' > /etc/nginx/conf.d/00-tokens.conf
 fi
@@ -62,7 +58,6 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
   ufw allow 80/tcp >/dev/null
 fi
 
-# ---------- 2. Порт заглушки ----------
 OLD=$(ls /etc/nginx/conf.d/stub*.conf 2>/dev/null | head -1 || true)
 PORT=""
 if [ -n "$OLD" ]; then
@@ -77,7 +72,6 @@ fi
 [ -n "$PORT" ] || { echo "Не нашёл свободный порт для заглушки"; exit 1; }
 echo "Порт заглушки: 127.0.0.1:$PORT"
 
-# ---------- 3. Порт 80 и сертификат ----------
 cat > /etc/nginx/conf.d/redirect80.conf <<EOF
 server {
     listen 80;
@@ -96,13 +90,11 @@ if [ ! -f "/etc/letsencrypt/live/$D/fullchain.pem" ]; then
 fi
 openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$D/fullchain.pem"
 
-# автопродление + перезагрузка nginx после обновления
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
 systemctl enable --now certbot.timer 2>/dev/null || true
 
-# ---------- 4. Заглушка ----------
 NGV=$(nginx -v 2>&1 | grep -o '[0-9.]*$')
 if [ "$(printf '%s\n1.25.1\n' "$NGV" | sort -V | head -1)" = "1.25.1" ]; then
   H2L="ssl"; H2D="http2 on;"
@@ -128,7 +120,6 @@ EOF
 nginx -t
 systemctl reload nginx
 
-# ---------- 5. Сайт ----------
 MAIL="hello@$D"
 
 case "$THEME" in
